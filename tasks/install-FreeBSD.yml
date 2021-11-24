@@ -1,6 +1,11 @@
 ---
 
-- name: Install icingaweb2
-  pkgng:
-    name: icingaweb2
+- name: Install icingaweb2_package
+  ansible.builtin.pkgng:
+    name: "{{ icingaweb2_package }}"
+    state: present
+
+- name: Install icingaweb2_extra_packages
+  ansible.builtin.pkgng:
+    name: "{{ icingaweb2_extra_packages }}"
     state: present

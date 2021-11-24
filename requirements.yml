@@ -1,0 +1,9 @@
+---
+
+roles:
+  - name: trombik.postgresql
+  - name: trombik.php_fpm
+  - name: trombik.nginx
+  - name: trombik.icinga2
+collections:
+  - name: community.general

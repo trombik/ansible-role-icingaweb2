@@ -1,9 +1,22 @@
 ---
-icingaweb2_user: icingaweb2
-icingaweb2_group: icingaweb2
-icingaweb2_log_dir: /var/log/icingaweb2
-icingaweb2_db_dir: "{{ __icingaweb2_db_dir }}"
-icingaweb2_service: icingaweb2
+icingaweb2_user: "{{ __icingaweb2_user }}"
+icingaweb2_group: "{{ __icingaweb2_group }}"
+icingaweb2_package: "{{ __icingaweb2_package }}"
+icingaweb2_extra_packages: []
 icingaweb2_conf_dir: "{{ __icingaweb2_conf_dir }}"
-icingaweb2_conf_file: "{{ __icingaweb2_conf_dir }}/icingaweb2.conf"
-icingaweb2_flags: ""
+icingaweb2_conf_files: []
+icingaweb2_modules: []
+
+icingaweb2_database_host: 127.0.0.1
+icingaweb2_database_port: 5432
+icingaweb2_database_type: postgresql
+icingaweb2_database_name: icingaweb
+icingaweb2_database_login_host: "{{ icingaweb2_database_host }}"
+icingaweb2_database_login_user: icingaweb
+icingaweb2_database_login_password: ""
+icingaweb2_database_user: icingaweb
+icingaweb2_database_password: password
+icingaweb2_database_schema_file: "{{ __icingaweb2_database_schema_file }}"
+icingaweb2_default_admin_name: admin
+icingaweb2_default_admin_password: ""
+icingaweb2_password_seed: "{{ inventory_hostname }}"

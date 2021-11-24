@@ -1,37 +1,136 @@
 ---
 # tasks file for ansible-role-icingaweb2
 
-- include_vars: "{{ ansible_os_family }}.yml"
+- name: "Include {{ ansible_os_family }}.yml"
+  include_vars: "{{ ansible_os_family }}.yml"
 
-- include: "install-{{ ansible_os_family }}.yml"
+- name: "Include install-{{ ansible_os_family }}.yml"
+  include: "install-{{ ansible_os_family }}.yml"
 
-- name: Create log directory
-  file:
-    path: "{{ icingaweb2_log_dir }}"
-    mode: 0755
+- name: Create enabledModules dirctory
+  ansible.builtin.file:
+    path: "{{ icingaweb2_conf_dir }}/enabledModules"
+    mode: "0750"
     owner: "{{ icingaweb2_user }}"
     group: "{{ icingaweb2_group }}"
     state: directory
-  notify: Restart icingaweb2
 
-- name: Create db directory
-  file:
-    path: "{{ icingaweb2_db_dir }}"
-    mode: 0755
+- name: Create modules directory
+  ansible.builtin.file:
+    path: "{{ icingaweb2_conf_dir }}/modules"
+    mode: "0750"
     owner: "{{ icingaweb2_user }}"
     group: "{{ icingaweb2_group }}"
     state: directory
-  notify: Restart icingaweb2
 
-- name: Create icingaweb2.conf
-  template:
-    src: icingaweb2.conf.j2
-    dest: "{{ icingaweb2_conf_file }}"
-    validate: echo %s
-  notify: Restart icingaweb2
+- name: Create modules/monitoring directory
+  ansible.builtin.file:
+    path: "{{ icingaweb2_conf_dir }}/modules/monitoring"
+    mode: "0750"
+    owner: "{{ icingaweb2_user }}"
+    group: "{{ icingaweb2_group }}"
+    state: directory
 
-- name: Start icingaweb2
-  service:
-    name: "{{ icingaweb2_service }}"
-    enabled: true
-    state: started
+- name: Create icingaweb2_conf_files
+  ansible.builtin.template:
+    src: config.ini.j2
+    dest: "{{ icingaweb2_conf_dir }}/{{ item['name'] }}"
+    owner: "{{ item['owner'] | default(icingaweb2_user) }}"
+    group: "{{ item['group'] | default(icingaweb2_group) }}"
+    mode: "{{ item['mode'] | default('0640') }}"
+  with_items: "{{ icingaweb2_conf_files }}"
+  when:
+    - item['state'] | default('present') == 'present'
+
+- name: Delete icingaweb2_conf_files
+  ansible.builtin.file:
+    path: "{{ icingaweb2_conf_dir }}/{{ item['name'] }}"
+  with_items: "{{ icingaweb2_conf_files }}"
+  when:
+    - "'state' in item and item['state'] == 'absent'"
+
+- name: Enable modules
+  ansible.builtin.command: "icingacli module enable {{ item['name'] | quote }}"
+  args:
+    creates: "{{ icingaweb2_conf_dir }}/enabledModules/{{ item['name'] }}"
+  with_items: "{{ icingaweb2_modules }}"
+  when:
+    - item['state'] | default('enabled') == 'enabled'
+
+- name: Disable modules
+  ansible.builtin.command: "icingacli module disable {{ item['name'] | quote }}"
+  args:
+    removes: "{{ icingaweb2_conf_dir }}/enabledModules/{{ item['name'] }}"
+  with_items: "{{ icingaweb2_modules }}"
+  when:
+    - "'state' in item and item['state'] == 'disabled'"
+
+- name: Create database (postgresql)
+  community.general.postgresql_db:
+    login_host: "{{ icingaweb2_database_login_host }}"
+    login_user: "{{ icingaweb2_database_login_user }}"
+    login_password: "{{ icingaweb2_database_login_password }}"
+    port: "{{ icingaweb2_database_port }}"
+    name: "{{ icingaweb2_database_name }}"
+    owner: "{{ icingaweb2_database_user }}"
+    state: present
+  register: __icingaweb2_create_database
+  when:
+    - icingaweb2_database_type == 'postgresql'
+
+- name: See if database schema is in the database (postgresql)
+  community.general.postgresql_query:
+    login_host: "{{ icingaweb2_database_login_host }}"
+    login_user: "{{ icingaweb2_database_login_user }}"
+    login_password: "{{ icingaweb2_database_login_password }}"
+    port: "{{ icingaweb2_database_port }}"
+    db: "{{ icingaweb2_database_name }}"
+    query: SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'icingaweb%')
+  register: __icingaweb2_schema_exists
+  when:
+    - icingaweb2_database_type == 'postgresql'
+
+- name: Create database schema (postgresql)
+  community.general.postgresql_db:
+    login_host: "{{ icingaweb2_database_login_host }}"
+    login_user: "{{ icingaweb2_database_login_user }}"
+    login_password: "{{ icingaweb2_database_login_password }}"
+    port: "{{ icingaweb2_database_port }}"
+    name: "{{ icingaweb2_database_name }}"
+    owner: "{{ icingaweb2_database_user }}"
+    target: "{{ icingaweb2_database_schema_file }}"
+    state: restore
+  when:
+    - icingaweb2_database_type == 'postgresql'
+    - not __icingaweb2_schema_exists['query_result'][0]['exists']
+
+- name: See if icingaweb2_default_admin_name user exists (postgresql)
+  community.general.postgresql_query:
+    login_host: "{{ icingaweb2_database_login_host }}"
+    login_user: "{{ icingaweb2_database_login_user }}"
+    login_password: "{{ icingaweb2_database_login_password }}"
+    port: "{{ icingaweb2_database_port }}"
+    db: "{{ icingaweb2_database_name }}"
+    query: SELECT EXISTS (SELECT 1 FROM icingaweb_user WHERE name = %(name)s);
+    named_args:
+      name: "{{ icingaweb2_default_admin_name }}"
+  register: __icingaweb2_default_admin_exists
+  when:
+    - icingaweb2_database_type == 'postgresql'
+
+- name: Create icingaweb2_default_admin_name user (postgresql)
+  community.general.postgresql_query:
+    login_host: "{{ icingaweb2_database_login_host }}"
+    login_user: "{{ icingaweb2_database_login_user }}"
+    login_password: "{{ icingaweb2_database_login_password }}"
+    port: "{{ icingaweb2_database_port }}"
+    db: "{{ icingaweb2_database_name }}"
+    query: "INSERT INTO icingaweb_user (name, active, password_hash) VALUES (%(name)s, 1, %(password_hash)s)"
+    named_args:
+      name: "{{ icingaweb2_default_admin_name }}"
+      # see: Manual User Creation for Database Authentication Backend
+      # https://icinga.com/docs/icinga-web-2/latest/doc/20-Advanced-Topics/#manual-user-creation-for-database-authentication-backend
+      password_hash: "{{ icingaweb2_default_admin_password | password_hash('bcrypt') }}"
+  when:
+    - icingaweb2_database_type == 'postgresql'
+    - not __icingaweb2_default_admin_exists['query_result'][0]['exists']
