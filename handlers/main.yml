@@ -1,0 +1,6 @@
+---
+
+- name: Restart icingaweb2
+  service:
+    name: icingaweb2
+    state: restarted

@@ -1,0 +1,37 @@
+---
+# tasks file for ansible-role-icingaweb2
+
+- include_vars: "{{ ansible_os_family }}.yml"
+
+- include: "install-{{ ansible_os_family }}.yml"
+
+- name: Create log directory
+  file:
+    path: "{{ icingaweb2_log_dir }}"
+    mode: 0755
+    owner: "{{ icingaweb2_user }}"
+    group: "{{ icingaweb2_group }}"
+    state: directory
+  notify: Restart icingaweb2
+
+- name: Create db directory
+  file:
+    path: "{{ icingaweb2_db_dir }}"
+    mode: 0755
+    owner: "{{ icingaweb2_user }}"
+    group: "{{ icingaweb2_group }}"
+    state: directory
+  notify: Restart icingaweb2
+
+- name: Create icingaweb2.conf
+  template:
+    src: icingaweb2.conf.j2
+    dest: "{{ icingaweb2_conf_file }}"
+    validate: echo %s
+  notify: Restart icingaweb2
+
+- name: Start icingaweb2
+  service:
+    name: "{{ icingaweb2_service }}"
+    enabled: true
+    state: started

@@ -1,0 +1,6 @@
+---
+
+- name: Install icingaweb2
+  pkgng:
+    name: icingaweb2
+    state: present
