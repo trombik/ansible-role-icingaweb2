@@ -1,10 +1,11 @@
-# ansible-role-icingaweb2
+# `trombik.icingaweb2`
 
-A brief description of the role goes here.
+`ansible` role to manage `icingaweb2`.
 
 # Requirements
 
-None
+* [trombik.x509_certificate](https://github.com/trombik/ansible-role-x509_certificate)
+  if you need API
 
 # Role Variables
 
