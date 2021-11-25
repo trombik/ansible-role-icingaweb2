@@ -5,5 +5,7 @@ roles:
   - name: trombik.php_fpm
   - name: trombik.nginx
   - name: trombik.icinga2
+  - name: trombik.cfssl
+  - name: trombik.x509_certificate
 collections:
   - name: community.general

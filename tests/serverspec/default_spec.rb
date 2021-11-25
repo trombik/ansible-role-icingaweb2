@@ -13,6 +13,7 @@ config_dir = case os[:family]
              else
                "/etc/icingaweb2"
              end
+data_dir = "/var/lib/icinga2"
 user    = "www"
 group   = "www"
 config_files = %w[
@@ -29,9 +30,20 @@ db_user = "icingaweb"
 db_name = "icingaweb"
 db_password = "password"
 admin_user = "admin"
+api_user = "root"
+api_password = "0660d951f4a29e8b"
+api_endpoint = "https://localhost:5665/v1"
 
 describe package(package) do
   it { should be_installed }
+end
+
+describe file config_dir do
+  it { should exist }
+  it { should be_directory }
+  it { should be_owned_by user }
+  it { should be_grouped_into group }
+  it { should be_mode 755 }
 end
 
 config_files.each do |f|
@@ -58,4 +70,11 @@ describe command "env PGPASSWORD=#{db_password} psql --host 127.0.0.1 --user #{d
   its(:stdout) { should match(/name\s+\|\s+#{admin_user}/) }
   its(:stdout) { should match(/active\s+\|\s+1/) }
   its(:stdout) { should match(/password_hash\s+\|\s+\\x[0-9a-z]+/) }
+end
+
+# API works?
+describe command "curl -v --user #{api_user}:#{api_password} --cacert #{data_dir}/certs/ca.crt #{api_endpoint}" do
+  its(:exit_status) { should eq 0 }
+  its(:stderr) { should match(/SSL certificate verify ok/) }
+  its(:stdout) { should match(%r{You are authenticated as <b>root<\/b>}) }
 end

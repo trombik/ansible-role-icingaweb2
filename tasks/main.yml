@@ -7,6 +7,16 @@
 - name: "Include install-{{ ansible_os_family }}.yml"
   include: "install-{{ ansible_os_family }}.yml"
 
+- name: Ensure icingaweb2_conf_dir is writable by icingaweb2_user
+  # XXX icingaweb2 expects the directory is writable, such as when creating a
+  # dashboard from the Web UI.
+  ansible.builtin.file:
+    path: "{{ icingaweb2_conf_dir }}"
+    mode: "0755"
+    owner: "{{ icingaweb2_user }}"
+    group: "{{ icingaweb2_group }}"
+    state: directory
+
 - name: Create enabledModules dirctory
   ansible.builtin.file:
     path: "{{ icingaweb2_conf_dir }}/enabledModules"

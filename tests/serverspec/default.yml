@@ -2,6 +2,7 @@
 - hosts: localhost
   roles:
     - role: trombik.postgresql
+    - role: trombik.cfssl
     - role: trombik.icinga2
     - role: trombik.php_fpm
     - role: trombik.nginx
@@ -37,6 +38,9 @@
     icinga2_database_name: "{{ project_db_ido_name }}"
     icinga2_database_user: "{{ project_db_ido_user }}"
     icinga2_database_password: "{{ project_db_ido_password }}"
+
+    project_api_user: root
+    project_api_password: 0660d951f4a29e8b
 
     icingaweb2_default_admin_password: password
     icingaweb2_modules:
@@ -110,9 +114,12 @@
 
       - name: modules/monitoring/commandtransports.ini
         content: |
-          [icinga2]
-          transport = "local"
-          path = "/var/run/icinga2/cmd/icinga2.cmd"
+          [API]
+          transport = "api"
+          host = "localhost"
+          port = "5665"
+          username = "root"
+          password = "0660d951f4a29e8b"
 
       - name: modules/monitoring/config.ini
         content: |
@@ -388,6 +395,55 @@
       - name: ido-pgsql
       - name: mainlog
       - name: notification
+      - name: api
+
+    icinga2_include_role_x509_certificate: yes
+    # XXX The ApiListener type expects its certificate files to be in
+    # certain locations. see:
+    # https://icinga.com/docs/icinga-2/latest/doc/09-object-types/#objecttype-apilistener
+    project_root_ca_cert_file: "{{ icinga2_data_dir }}/certs/ca.crt"
+    icinga2_x509_certificate_vars:
+      x509_certificate_debug_log: yes
+      x509_certificate_cfssl_scheme: http
+      x509_certificate_cfssl_host: 127.0.0.1
+      x509_certificate_cfssl_info:
+        - path: "{{ project_root_ca_cert_file }}"
+          body:
+            label: primary
+            profile: default
+      x509_certificate_cfssl_certificate_newcert:
+        - csr:
+            path: "{{ icinga2_data_dir }}/certs/{{ ansible_hostname }}.csr"
+            owner: "{{ icinga2_user }}"
+            group: "{{ icinga2_group }}"
+            mode: "0444"
+          public:
+            path: "{{ icinga2_data_dir }}/certs/{{ ansible_hostname }}.crt"
+            owner: "{{ icinga2_user }}"
+            group: "{{ icinga2_group }}"
+            mode: "0444"
+            notify:
+              - Restart icinga2
+          private:
+            path: "{{ icinga2_data_dir }}/certs/{{ ansible_hostname }}.key"
+            owner: "{{ icinga2_user }}"
+            group: "{{ icinga2_group }}"
+            mode: "0440"
+          body:
+            profile: backend
+            request:
+              CN: "{{ ansible_hostname }}"
+              hosts:
+                - 127.0.0.1
+                - localhost
+                - ::1
+                - "{{ ansible_hostname }}"
+                - "{{ ansible_fqdn }}"
+              key:
+                algo: rsa
+                size: 2048
+              names:
+                - O: example.org
 
     icinga2_conf_files:
       - name: icinga2.conf
@@ -537,21 +593,35 @@
           /* Our local instance name. By default this is the server's hostname as returned by `hostname --fqdn`.
            * This should be the common name from the API certificate.
            */
-          const NodeName = "default-freebsd-130-amd64.vagrantup.com"
+          const NodeName = "{{ ansible_hostname }}"
 
           /* Our local zone name. */
-          const ZoneName = "default-freebsd-130-amd64.vagrantup.com"
+          const ZoneName = "{{ ansible_hostname }}"
 
           /* Secret key for remote node tickets */
           const TicketSalt = ""
 
       - name: conf.d/api-users.conf
         content: |
-          object ApiUser "root" {
-            password = "0660d951f4a29e8b"
+          object ApiUser "{{ project_api_user }}" {
+            password = "{{ project_api_password }}"
             // client_cn = ""
 
             permissions = [ "*" ]
+          }
+      - name: features-available/api.conf
+        content: |
+          /**
+           * The API listener is used for distributed monitoring setups.
+           */
+
+          object ApiListener "api" {
+            bind_host = "{{ icinga2_api_bind_host }}"
+            bind_port = {{ icinga2_api_bind_port }}
+            //accept_config = false
+            //accept_commands = false
+
+            ticket_salt = TicketSalt
           }
       - name: conf.d/app.conf
         content: |
@@ -1196,3 +1266,66 @@
            */
 
           object NotificationComponent "notification" { }
+    # _____________________________________________cfssl
+    cfssl_db_migration_environment: production
+    cfssl_db_migration_config:
+      production:
+        driver: sqlite3
+        open: "{{ cfssl_db_sqlite_database_file }}"
+
+    cfssl_db_type: sqlite
+    os_cfssl_extra_packages:
+      FreeBSD: sqlite3
+    cfssl_extra_packages: "{{ os_cfssl_extra_packages[ansible_os_family] }}"
+    project_auth_key: 0123456789ABCDEF0123456789ABCDEF
+    project_auth_key_name: primary
+
+    # this test case follows the same steps described at
+    # https://docs.sensu.io/sensu-go/latest/guides/generate-certificates/
+    cfssl_ca_config:
+      auth_keys:
+        primary:
+          type: standard
+          key: "{{ project_auth_key }}"
+      signing:
+        default:
+          expiry: 17520h
+          usages:
+            - signing
+            - key encipherment
+            - client auth
+          auth_key: "{{ project_auth_key_name }}"
+        profiles:
+          backend:
+            expiry: 4320h
+            usages:
+              - signing
+              - key encipherment
+              - server auth
+              - client auth
+            auth_key: "{{ project_auth_key_name }}"
+          agent:
+            expiry: 4320h
+            usages:
+              - signing
+              - key encipherment
+              - client auth
+            auth_key: "{{ project_auth_key_name }}"
+
+    # see https://github.com/cloudflare/cfssl/tree/master/certdb/README.md
+    cfssl_db_config:
+      driver: sqlite3
+      data_source: "{{ cfssl_db_sqlite_database_file }}"
+
+    cfssl_ca_csr_config:
+      CN: Test CA
+      key:
+        algo: rsa
+        size: 2048
+    os_cfssl_flags:
+      FreeBSD: |
+
+        cfssl_flags="-db-config {{ cfssl_ca_root_dir }}/db.json -ca {{ cfssl_ca_root_dir }}/ca.pem -ca-key {{ cfssl_ca_root_dir }}/ca-key.pem -config {{ cfssl_ca_config_file }} -address 127.0.0.1"
+      Debian: ""
+    cfssl_flags: "{{ os_cfssl_flags[ansible_os_family] }}"
+    # "
