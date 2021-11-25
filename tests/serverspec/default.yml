@@ -49,6 +49,8 @@
       - name: setup
         state: disabled
 
+    icingaweb2_extra_packages:
+      - jq
     icingaweb2_conf_files:
       - name: config.ini
         content: |
@@ -932,6 +934,14 @@
               groups = [ "icingaadmins" ]
             }
           }
+
+          object Host "Google DNS" {
+            import "generic-host"
+            address = "8.8.8.8"
+            vars.dns_services["google.com"] = {
+              dig_lookup = "google.com"
+            }
+          }
       - name: conf.d/notifications.conf
         content: |
           /**
@@ -1081,6 +1091,12 @@
             check_command = "users"
 
             assign where host.name == NodeName
+          }
+
+          apply Service "dig" for (dns_service => config in host.vars.dns_services) {
+            import "generic-service"
+            check_command = "dig"
+            vars += config
           }
 
       - name: conf.d/templates.conf

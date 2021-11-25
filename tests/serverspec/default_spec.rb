@@ -78,3 +78,9 @@ describe command "curl -v --user #{api_user}:#{api_password} --cacert #{data_dir
   its(:stderr) { should match(/SSL certificate verify ok/) }
   its(:stdout) { should match(%r{You are authenticated as <b>root<\/b>}) }
 end
+
+describe command "curl -v --user #{api_user}:#{api_password} --cacert #{data_dir}/certs/ca.crt #{api_endpoint}/objects/hosts | jq '.results'" do
+  its(:exit_status) { should eq 0 }
+  its(:stderr) { should match(/SSL certificate verify ok/) }
+  its(:stdout_as_json) { should include(hash_including("attrs" => include("__name" => "Google DNS"))) }
+end
