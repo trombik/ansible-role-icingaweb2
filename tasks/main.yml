@@ -51,6 +51,8 @@
   with_items: "{{ icingaweb2_conf_files }}"
   when:
     - item['state'] | default('present') == 'present'
+  notify:
+    - Restart icingaweb2
 
 - name: Delete icingaweb2_conf_files
   ansible.builtin.file:
@@ -58,6 +60,8 @@
   with_items: "{{ icingaweb2_conf_files }}"
   when:
     - "'state' in item and item['state'] == 'absent'"
+  notify:
+    - Restart icingaweb2
 
 - name: Enable modules
   ansible.builtin.command: "icingacli module enable {{ item['name'] | quote }}"
@@ -66,6 +70,8 @@
   with_items: "{{ icingaweb2_modules }}"
   when:
     - item['state'] | default('enabled') == 'enabled'
+  notify:
+    - Restart icingaweb2
 
 - name: Disable modules
   ansible.builtin.command: "icingacli module disable {{ item['name'] | quote }}"
@@ -74,6 +80,8 @@
   with_items: "{{ icingaweb2_modules }}"
   when:
     - "'state' in item and item['state'] == 'disabled'"
+  notify:
+    - Restart icingaweb2
 
 - name: Create database (postgresql)
   community.general.postgresql_db:
