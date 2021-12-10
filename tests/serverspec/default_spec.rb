@@ -14,6 +14,8 @@ config_dir = case os[:family]
                "/etc/icingaweb2"
              end
 data_dir = "/var/lib/icinga2"
+plugin_contrib_dir = "/usr/local/libexec/nagios"
+
 user    = "www"
 group   = "www"
 config_files = %w[
@@ -54,6 +56,37 @@ config_files.each do |f|
     it { should be_mode 640 }
     its(:content) { should match(/Managed by ansible/) }
   end
+end
+
+describe file "#{config_dir}/plugins" do
+  it { should exist }
+  it { should be_directory }
+  it { should be_owned_by user }
+  it { should be_grouped_into group }
+  it { should be_mode 755 }
+end
+
+describe file "#{config_dir}/plugins/check_json" do
+  it { should exist }
+  it { should be_directory }
+  it { should be_mode 755 }
+end
+
+describe file "#{config_dir}/plugins/check_json/check_json.pl" do
+  it { should exist }
+  it { should be_file }
+  it { should be_mode 755 }
+end
+
+describe file "#{plugin_contrib_dir}/check_json.pl" do
+  it { should exist }
+  it { should be_linked_to "#{config_dir}/plugins/check_json/check_json.pl" }
+end
+
+describe command "#{plugin_contrib_dir}/check_json.pl" do
+  its(:exit_status) { should eq 3 }
+  its(:stderr) { should eq "" }
+  its(:stdout) { should match(/Usage:/) }
 end
 
 # is the database empty?

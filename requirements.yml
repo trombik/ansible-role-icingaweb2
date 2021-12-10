@@ -2,6 +2,7 @@
 
 roles:
   - name: trombik.postgresql
+  - name: trombik.git
   - name: trombik.php_fpm
   - name: trombik.nginx
   - name: trombik.icinga2

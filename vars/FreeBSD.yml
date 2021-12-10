@@ -4,3 +4,4 @@ __icingaweb2_group: www
 __icingaweb2_package: icingaweb2-php74
 __icingaweb2_conf_dir: /usr/local/etc/icingaweb2
 __icingaweb2_database_schema_file: /usr/local/www/icingaweb2/etc/schema/pgsql.schema.sql
+__icingaweb2_plugin_contrib_dir: /usr/local/libexec/nagios
