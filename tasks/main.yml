@@ -41,6 +41,52 @@
     group: "{{ icingaweb2_group }}"
     state: directory
 
+- name: Create icingaweb2_plugins_git_dir
+  ansible.builtin.file:
+    path: "{{ icingaweb2_plugins_git_dir }}"
+    mode: "0755"
+    owner: "{{ icingaweb2_user }}"
+    group: "{{ icingaweb2_group }}"
+    state: directory
+
+- name: Install plugins in icingaweb2_plugins_git
+  ansible.builtin.git:
+    accept_hostkey: "{{ item['git']['accept_hostkey'] | default(omit) }}"
+    accept_newhostkey: "{{ item['git']['accept_newhostkey'] | default(omit) }}"
+    archive: "{{ item['git']['archive'] | default(omit) }}"
+    archive_prefix: "{{ item['git']['archive_prefix'] | default(omit) }}"
+    bare: "{{ item['git']['bare'] | default(omit) }}"
+    clone: "{{ item['git']['clone'] | default(omit) }}"
+    depth: "{{ item['git']['depth'] | default(omit) }}"
+    dest: "{{ icingaweb2_plugins_git_dir }}/{{ item['name'] }}"
+    executable: "{{ item['git']['executable'] | default(omit) }}"
+    force: "{{ item['git']['force'] | default(omit) }}"
+    gpg_whitelist: "{{ item['git']['gpg_whitelist'] | default(omit) }}"
+    key_file: "{{ item['git']['key_file'] | default(omit) }}"
+    recursive: "{{ item['git']['recursive'] | default(omit) }}"
+    reference: "{{ item['git']['reference'] | default(omit) }}"
+    refspec: "{{ item['git']['refspec'] | default(omit) }}"
+    remote: "{{ item['git']['remote'] | default(omit) }}"
+    repo: "{{ item['git']['repo'] }}"
+    separate_git_dir: "{{ item['git']['separate_git_dir'] | default(omit) }}"
+    single_branch: "{{ item['git']['single_branch'] | default(omit) }}"
+    ssh_opts: "{{ item['git']['ssh_opts'] | default(omit) }}"
+    track_submodules: "{{ item['git']['track_submodules'] | default(omit) }}"
+    umask: "{{ item['git']['umask'] | default('0022') }}"
+    # XXX `update` is one of methods of dict object, and cannot be used here.
+    # use `git_update` to avoid collision
+    update: "{{ item['git']['git_update'] | default(omit) }}"
+    verify_commit: "{{ item['git']['verify_commit'] | default(omit) }}"
+    version: "{{ item['git']['version'] | default(omit) }}"
+  with_items: "{{ icingaweb2_plugins_git }}"
+
+- name: Create links to checks in icingaweb2_plugins_git
+  ansible.builtin.file:
+    path: "{{ icingaweb2_plugin_contrib_dir }}/{{ item[1] }}"
+    src: "{{ icingaweb2_plugins_git_dir }}/{{ item[0]['name'] }}/{{ item[1] }}"
+    state: link
+  loop: "{{ icingaweb2_plugins_git | subelements('links') }}"
+
 - name: Create icingaweb2_conf_files
   ansible.builtin.template:
     src: config.ini.j2
